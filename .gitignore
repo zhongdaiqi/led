@@ -1,0 +1,71 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# WorkBuddy local data
+.workbuddy/
+
+# ---- 签名密钥 / 证书：绝不入库 ----
+# Android release 签名（真实凭据在 android/key.properties）
+android/key.properties
+# OHOS 签名配置含明文密钥密码，且证书文件也在本地
+ohos/build-profile.json5
+*.keystore
+*.jks
+*.p12
+*.p8
+*.pem
+*.cer
+*.p7b
+*.mobileprovision
+*.provisionprofile
+
+# OHOS 本地构建产物/脚本
+ohos/hvigorw.js
+ohos/hvigorw.bat
+ohos/.hvigor-shim/
+
+# 交付安装包（体积大，且非源码）
+/dist/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release

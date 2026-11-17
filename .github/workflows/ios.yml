@@ -1,0 +1,82 @@
+name: iOS Build (unsigned)
+
+# 目的：在没有 Mac 的前提下，用 GitHub macOS runner 把电子灯牌 Flutter 工程
+#       编译出 iOS App（未签名）。用于快速验证「能编译过 / 依赖能解析」，
+#       不上传苹果，不计费昂贵的签名与 TestFlight 上传。
+#
+# 触发：手动（Actions -> iOS Build (unsigned) -> Run workflow），或推到 main。
+#       刻意不挂 tag：macOS runner 是 Linux 的 ~10 倍计费，日常提交用本工作流即可，
+#       真正上架走 ios-release.yml。
+#
+# 本仓库 pubspec 无本地 path 依赖、无第三方原生 SDK，无需额外补丁，直接构建。
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'ohos/**'
+      - 'android/**'
+
+permissions:
+  contents: read
+
+env:
+  # 必须与项目实际使用的 Flutter 版本一致（本地 OHOS fork 基于 3.41.9）。
+  # 用更高版本会让「CI 绿了」证明不了真实目标能编过。
+  FLUTTER_VERSION: '3.41.9'
+
+jobs:
+  build-ios:
+    name: 构建 iOS（未签名）
+    runs-on: macos-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 环境信息（排错用）
+        run: |
+          flutter --version
+          echo "--- Xcode ---"
+          xcodebuild -version
+
+      # DEVELOPMENT_TEAM 为占位值：flutter 3.41 在 xcodebuild buildSettings
+      # 缺少 DEVELOPMENT_TEAM 键时会无条件失败（即使 --no-codesign 且编译
+      # 已成功）；占位 team 在 --no-codesign 下不发生真实签名。
+      - name: 注入占位 DEVELOPMENT_TEAM
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          p = 'ios/Runner.xcodeproj/project.pbxproj'
+          s = open(p, encoding='utf-8').read()
+          if 'DEVELOPMENT_TEAM' not in s:
+              s = s.replace('buildSettings = {', 'buildSettings = {\n\t\t\t\tDEVELOPMENT_TEAM = CI00000000;')
+              open(p, 'w', encoding='utf-8').write(s)
+              print('DEVELOPMENT_TEAM placeholder injected')
+          else:
+              print('DEVELOPMENT_TEAM already present, skipped')
+          PY
+
+      - name: 拉取依赖
+        run: flutter pub get
+
+      - name: 构建 iOS（未签名）
+        # --build-number 取 run number，避免重复构建号
+        run: flutter build ios --release --no-codesign --build-number=${{ github.run_number }}
+
+      - name: 上传未签名 App（排错用）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-unsigned-runner-${{ github.run_number }}
+          path: build/ios/iphoneos/Runner.app
+          if-no-files-found: ignore

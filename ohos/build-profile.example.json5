@@ -1,0 +1,22 @@
+// 复制本文件为 build-profile.json5 并填入你自己的 HarmonyOS 签名材料。
+// 真实的 build-profile.json5 含密钥密码，已被 gitignore，绝不能提交到仓库。
+// certpath / profile / storeFile 指向本地证书文件，也不要提交这些文件。
+{
+  "app": {
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "/absolute/path/to/your/cert.cer",
+          "keyAlias": "your_key_alias",
+          "keyPassword": "your_key_password",
+          "profile": "/absolute/path/to/your/profile.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "/absolute/path/to/your/keystore.p12",
+          "storePassword": "your_store_password"
+        }
+      }
+    ]
+  }
+}
