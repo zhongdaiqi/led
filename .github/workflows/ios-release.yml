@@ -25,6 +25,12 @@ name: iOS Release (TestFlight)
 #      分别填进仓库 Secrets（APP_STORE_CONNECT_KEY_ID / ISSUER_ID / API_KEY）。
 #   4. App Store Connect 里填好隐私政策 URL
 #      （https://led.zuime.com/privacy.html）与隐私营养标签问卷。
+#
+# SDK 版本要求（ITMS-90725）：
+#   Apple 要求自 2027-04 起，上传的 build 必须用 iOS 27 SDK（Xcode 27+）构建。
+#   当前 macos-latest 预装最高 Xcode 26.6 / iOS 26.5 SDK，Xcode 27 尚未进 runner，
+#   因此现在无法升级，只会收到警告（不影响当前上架）。下方「SDK 版本门槛检查」
+#   会在 2027-04 之后自动拦截旧 SDK 构建，届时需确保 runner 已提供 Xcode 27。
 # ---------------------------------------------------------------------------
 
 on:
@@ -61,11 +67,28 @@ jobs:
           channel: stable
           cache: true
 
-      - name: 环境信息（排错用）
+      - name: 环境信息 + SDK 版本门槛检查
         run: |
+          set -euo pipefail
           flutter --version
           echo "--- Xcode ---"
           xcodebuild -version
+
+          # Apple ITMS-90725：2027-04 起上传的 build 必须用 iOS 27 SDK（Xcode 27+）。
+          # 现在（Xcode 27 仍在 preview、runner 未预装）只提示不拦截；到期限后
+          # 若仍是旧 SDK 则直接失败，避免上架当天才被发现。
+          SDK_VERSION="$(xcrun --sdk iphoneos --show-sdk-version)"
+          SDK_MAJOR="${SDK_VERSION%%.*}"
+          echo "iOS SDK: $SDK_VERSION"
+          if [ "$SDK_MAJOR" -lt 27 ]; then
+            CUTOFF_TS="$(date -j -f '%Y-%m-%d' '2027-04-01' +%s)"
+            NOW_TS="$(date +%s)"
+            if [ "$NOW_TS" -ge "$CUTOFF_TS" ]; then
+              echo "::error::Apple 要求自 2027-04 起用 iOS 27+ SDK 构建（当前 iOS $SDK_VERSION）。请在 runner 上切换到 Xcode 27 后重试。"
+              exit 1
+            fi
+            echo "::warning::当前 iOS $SDK_VERSION SDK 低于 27；2027-04 起 Apple 将拒收，届时请升级 Xcode。"
+          fi
 
       # 真实 Team ID 由 Secrets 提供；注入后 --no-codesign 预热构建才不会被
       # flutter 3.41 的 buildSettings 检查拦下。归档步骤还会再用 xcodebuild
