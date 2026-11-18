@@ -1,6 +1,6 @@
 {
   "app": {
-    "bundleName": "com.zuime.led",
+    "bundleName": "com.zuime.led.hm",
     "vendor": "example",
     "versionCode": 1000000,
     "versionName": "1.0.0",

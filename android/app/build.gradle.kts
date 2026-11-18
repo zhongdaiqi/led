@@ -45,7 +45,14 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            // key.properties 缺失时（如 CI 零 Secret 的验证构建 android.yml）
+            // 回退 debug 签名，保证能编过；正式发布由 android-release.yml
+            // 从仓库 Secrets 还原 key.properties 后走真实 release 签名。
+            signingConfig = if (keystoreProperties.getProperty("storeFile") != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
