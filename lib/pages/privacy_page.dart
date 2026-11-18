@@ -20,14 +20,12 @@ class PrivacyGate extends StatefulWidget {
 class _PrivacyGateState extends State<PrivacyGate> {
   bool _busy = false;
 
-  Future<void> _accept() async {
+  void _accept() {
     if (_busy) return;
     setState(() => _busy = true);
-    // 先写本地再放行：写失败也放行，避免存储异常把用户永久挡在门外；
-    // 下次启动会再问一次。
-    await Storage.instance
-        .patchSettings(privacyVersion: kPrivacyPolicyVersion)
-        .catchError((_) => Storage.instance.getSettings());
+    // 立即放行，不因落盘阻塞用户进入（存储异常也不该把人挡在门外）。
+    // Storage 内部串行写入 + 切后台 flush 保证协议版本最终落盘。
+    Storage.instance.patchSettings(privacyVersion: kPrivacyPolicyVersion);
     if (!mounted) return;
     widget.onAccepted();
   }

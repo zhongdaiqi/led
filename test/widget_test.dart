@@ -28,6 +28,25 @@ void main() {
     expect(Storage.instance.getPhrases().length, 16);
   });
 
+  test('新建灯牌连着 upsert + touch 后仍能持久化（串行写不丢）', () async {
+    SharedPreferences.setMockInitialValues({});
+    await Storage.instance.init();
+
+    // 模拟亮牌链路：editor 先 upsert，播放页 initState 紧接 touch，两笔写并发。
+    final preset = Preset(text: '新牌', mode: 'static');
+    preset.id = Storage.genId();
+    final saved = await Storage.instance.upsertPreset(preset);
+    expect(saved, isNotNull);
+    await Storage.instance.touchPreset(preset.id);
+
+    // 重新读取底层存储，确认这块牌真的落盘了。
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(Storage.kPresets);
+    expect(raw, isNotNull);
+    expect(raw, contains('新牌'));
+    expect(Storage.instance.getPreset(preset.id), isNotNull);
+  });
+
   test('纹理按逻辑坐标烘焙，不随高 dpr 放大（防止文字被裁）', () {
     // ui.Picture 是矢量指令、drawPicture 按逻辑坐标 1:1 重放，
     // 所以任何 dpr 下 scale 都必须为 1，否则文字会被放大到屏幕外。

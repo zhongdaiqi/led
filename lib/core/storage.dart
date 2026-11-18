@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models.dart';
@@ -8,9 +9,11 @@ import '../models.dart';
 /// 本地数据层 —— 全项目唯一的持久化出口。
 /// key 前缀 lp: 与小程序一致；所有读写失败都吞掉，返回兜底值。
 /// 用内存缓存 + 异步落盘：页面同步读，写入点统一 await flush()。
-class Storage {
+class Storage with WidgetsBindingObserver {
   static final Storage instance = Storage._();
   Storage._();
+
+  bool _observerRegistered = false;
 
   static const String kPresets = 'lp:presets';
   static const String kSettings = 'lp:settings';
@@ -23,6 +26,25 @@ class Storage {
   AppSettings _settings = AppSettings();
   List<String> _phrases = [];
   List<String> _favorites = [];
+
+  /// 串行写入队列。所有落盘都挂在这条链上，杜绝并发 setString 相互覆盖
+  /// （亮牌时 upsertPreset 与播放页 touchPreset 会连着写同一个 key）。
+  Future<void> _writeChain = Future.value();
+
+  /// 等待所有已排队的写入真正落盘。切后台 / 退出前调用，防止 iOS 上
+  /// 未完成的异步写入被系统冻结而丢失。
+  Future<void> flush() => _writeChain;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 亮牌保存是异步落盘。用户点完亮牌常立刻锁屏/切后台，此时必须等
+    // 已排队的写入真正落盘，否则 iOS 上会被系统冻结导致「没保存」。
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.inactive) {
+      flush();
+    }
+  }
 
   static const List<String> defaultPhrases = [
     '谢谢',
@@ -44,6 +66,10 @@ class Storage {
   ];
 
   Future<void> init() async {
+    if (!_observerRegistered) {
+      WidgetsBinding.instance.addObserver(this);
+      _observerRegistered = true;
+    }
     try {
       _prefs = await SharedPreferences.getInstance();
     } catch (_) {
@@ -75,16 +101,19 @@ class Storage {
   }
 
   static List<T> _decodeList<T>(String? raw, T Function(String) decode) {
-    if (raw == null || raw.isEmpty) return const [];
+    // 必须返回可变的 List<T>：const [] 的运行时类型是 List<Never> 且不可变，
+    // 首次安装（无历史数据）时若把它赋给 _presets，后续 upsert 的 insert 会
+    // 抛「type 'X' is not a subtype of type 'Never'」，导致新建灯牌根本存不进去。
+    if (raw == null || raw.isEmpty) return <T>[];
     try {
       final v = jsonDecode(raw);
-      if (v is! List) return const [];
+      if (v is! List) return <T>[];
       return v.map((e) {
         if (e is String) return decode(e);
         return decode(jsonEncode(e));
       }).toList();
     } catch (_) {
-      return const [];
+      return <T>[];
     }
   }
 
@@ -95,7 +124,11 @@ class Storage {
       if (json.length * 2 > maxKeyBytes) return false;
       final prefs = _prefs;
       if (prefs == null) return false;
-      return await prefs.setString(key, json);
+      // 排队执行：本次写等上一次写落盘后才开始，避免并发覆盖。
+      // 结果通过这条链返回，调用方仍可逐笔 await 自己的写入。
+      final task = _writeChain.then((_) => prefs.setString(key, json));
+      _writeChain = task.then((_) {}, onError: (_) {});
+      return await task;
     } catch (_) {
       return false;
     }

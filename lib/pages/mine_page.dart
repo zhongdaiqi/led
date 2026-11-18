@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app.dart';
 import '../core/storage.dart';
 import '../core/templates.dart';
 import '../core/thumb.dart';
@@ -26,6 +27,13 @@ class _MinePageState extends State<MinePage> {
   void initState() {
     super.initState();
     _refresh();
+    kLibraryChanged.addListener(_refresh);
+  }
+
+  @override
+  void dispose() {
+    kLibraryChanged.removeListener(_refresh);
+    super.dispose();
   }
 
   void _refresh() {

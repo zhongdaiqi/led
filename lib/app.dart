@@ -13,6 +13,8 @@ import 'pages/talk_page.dart';
 import 'pages/template_page.dart';
 import 'theme.dart';
 
+export 'core/bus.dart';
+
 class LedApp extends StatefulWidget {
   const LedApp({super.key});
 

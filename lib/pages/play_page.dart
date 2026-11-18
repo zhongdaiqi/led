@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
+import '../core/bus.dart';
 import '../core/exporter.dart';
 import '../core/platform.dart';
 import '../core/renderer.dart';
@@ -114,6 +115,9 @@ class _PlayPageState extends State<PlayPage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    // 离开播放页时通知库已变化：新建灯牌走的是 editor→play 的替换路由，
+    // 返回后 home/mine 保活不会自己重建，靠这个信号重载列表。
+    kLibraryChanged.value++;
     _stopLoop();
     _stage?.texture?.dispose();
     _controlsTimer?.cancel();

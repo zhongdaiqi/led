@@ -23,6 +23,13 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _refresh();
+    kLibraryChanged.addListener(_refresh);
+  }
+
+  @override
+  void dispose() {
+    kLibraryChanged.removeListener(_refresh);
+    super.dispose();
   }
 
   void _refresh() {

@@ -153,8 +153,9 @@ class _EditorPageState extends State<EditorPage> with TickerProviderStateMixin {
       speed: _speed,
     );
     if (preset.id.isEmpty) preset.id = Storage.genId();
-    // 异步落盘，结果不影响跳转；播放页内存里已有这块牌，立即可用。
-    Storage.instance.upsertPreset(preset).catchError((_) => null);
+    // 落盘不阻塞跳转（保住「3 秒亮牌」）；Storage 内部已把写入串行化，
+    // 且 App 切后台/退出前会 flush，确保这块牌真正落盘、不会丢。
+    Storage.instance.upsertPreset(preset);
 
     if (!mounted) return;
     Navigator.of(context).pushReplacementNamed('/play', arguments: {'preset': preset});
